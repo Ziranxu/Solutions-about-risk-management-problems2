@@ -1,0 +1,99 @@
+---
+title: "HW2"
+author: "Ziran Xu"
+date: "2019/2/5"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Gaussian copula and Student’s-t4 copula.
+First, generate 20 multiviate normal r.v then take them into the CDF of the normal distribution(mean=0 and variance = 0.05^2).
+Then use the NRIG to get the log-return on each of these assets.
+```{r}
+library(MASS)
+library(pracma)
+sig=matrix(0.7,nrow=20,ncol=20)
+diag(sig)=1
+numbers = mvrnorm(n=1000,mu=numeric(20),Sigma = sig)  #generate the multiviate normal r.v
+numbers_Gaus_CDF = pnorm(numbers)    #cfd of the normal distribution generate Gaussian r.v
+t4_dist=function(x)    #cdf of the t4 distribution
+{
+  f=(1+(x*(6+x^2))/((4+x^2)^(3/2)))/2
+}
+numbers_t4_CDF = t4_dist(numbers)  # use t4 cdf to get the t4 r.v
+Norm_quan = function(p)  
+{
+  f=-sqrt(2)*erfc(2*p)
+  return(f)
+}
+NRIG_dens=function(x,g)
+{
+  y=mapply(function(x) {exp(g)*sqrt(1+g)*besselY(sqrt(g^2+(1+g)*x^2),0)/pi},x)
+  return(y)
+}
+NRIG_quan = function(p,g)  # set g=1
+{
+  x0=Norm_quan(p) 
+  x1=NaN
+  for(i in 1:20)
+  {
+    f=NRIG_dens(x0,g)
+   
+    x1=p-1/2+mapply(function(x0){quadgk(function(x){f-NRIG_dens(x,g)},0,x0)[1]/f},x0)
+    if(abs(x1-x0)<10^(-12))
+      break
+    x0=x1
+  }
+  
+  return(x1)
+}
+numbers_Gaus_NRIG = NRIG_quan(numbers_Gaus_CDF,1) # put the cdf of Gaussian r.v into NRIG quanile now get the log-return
+numbers_t4_NRIG= NRIG_quan(numbers_t4_CDF,1)  # put the cdf of t4 r.v into NRIG quanile now get the log-return
+
+Fib_numbers = 1:20       # generate the  Fibonacci numbers
+Fib_numbers[1]=1;Fib_numbers[2]=1
+for(i in 3:20)
+{
+  Fib_numbers[i]=Fib_numbers[i-1]+Fib_numbers[i-2]
+}
+
+```
+## Q1 average Pearson’s correlation  
+
+```{r}
+cor_Pear_Gaus=cor(numbers_Gaus_NRIG, use="complete.obs", method="pearson") 
+cor_Pear_t4=cor(numbers_t4_NRIG, use="complete.obs", method="pearson") 
+diag(cor_Pear_Gaus)=0
+diag(cor_Pear_t4)=0
+ave_Pear_Gaus = mean(cor_Pear_Gaus)
+ave_Pear_t4 = mean(cor_Pear_t4)
+cat(ave_Pear_Gaus,ave_Pear_t4)
+```
+## Q2 average Kendall’s rank correlation
+```{r}
+cor_Ken_Gaus=cor(numbers_Gaus_NRIG, use="complete.obs", method="kendall") 
+cor_Ken_t4=cor(numbers_t4_NRIG, use="complete.obs", method="kendall") 
+diag(cor_Ken_Gaus)=0
+diag(cor_Ken_t4)=0
+ave_Ken_Gaus=mean(cor_Ken_Gaus)
+ave_Ken_t4=mean(cor_Ken_t4)
+cat(ave_Ken_Gaus,ave_Ken_t4)
+```
+## Q3 standard deviation
+```{r}
+sd_logreturn_Gaus=sd(numbers_Gaus_NRIG*Fib_numbers)
+sd_logreturn_t4 = sd(numbers_t4_NRIG*Fib_numbers)
+cat(sd_logreturn_Gaus,sd_logreturn_t4)
+```
+## Q4 5% quantile of the index log-return
+```{r}
+quan_Gaus = quantile(numbers_Gaus_NRIG*Fib_numbers, 0.05)
+quan_t4=quantile(numbers_t4_NRIG*Fib_numbers,0.05)
+cat(quan_Gaus,quan_t4)
+```
